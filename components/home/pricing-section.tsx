@@ -1,4 +1,6 @@
-import Link from "next/link";
+// components/home/pricing-section.tsx
+"use client";
+
 import { cn } from "@/lib/utils";
 import { ArrowRight, Check, CheckIcon } from "lucide-react";
 import {
@@ -7,8 +9,9 @@ import {
   pricingPlans,
 } from "@/utils/constants";
 import { MotionDiv, MotionSection } from "@/components/common/motion-wrapper";
-import { vi } from "zod/v4/locales";
-import { scale } from "motion/react";
+import { initializePaddle, Paddle } from "@paddle/paddle-js";
+import { useEffect, useState } from "react";
+import { useUser } from "@clerk/nextjs";
 
 type PriceType = {
   name: string;
@@ -39,8 +42,56 @@ const PricingCard = ({
   description,
   items,
   id,
-  paymentLink,
+  priceId,
 }: PriceType) => {
+  const [paddle, setPaddle] = useState<Paddle>();
+
+  useEffect(() => {
+    initializePaddle({
+      environment:
+        process.env.NODE_ENV === "development" ? "sandbox" : "production",
+      token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!,
+    }).then((paddleInstance) => {
+      if (paddleInstance) {
+        setPaddle(paddleInstance);
+      }
+    });
+  }, []);
+
+  const handleCheckout = async () => {
+    if (!paddle) {
+      alert("Paddle not initialized");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/user");
+      const data = await res.json();
+
+      if (!data.userId) {
+        alert("User not logged in");
+        return;
+      }
+
+      const clerkUserId = data.userId;
+
+      paddle.Checkout.open({
+        items: [{ priceId: priceId, quantity: 1 }],
+        customData: {
+          clerk_user_id: clerkUserId, // ✅ Send it to Paddle
+        },
+        settings: {
+          displayMode: "overlay",
+          theme: "dark",
+          successUrl: `${window.location.origin}/dashboard`,
+        },
+      });
+    } catch (err) {
+      console.error("Error fetching user ID:", err);
+      alert("Something went wrong");
+    }
+  };
+
   return (
     <MotionDiv
       variants={listVariants}
@@ -82,21 +133,22 @@ const PricingCard = ({
             </li>
           ))}
         </MotionDiv>
+
         <MotionDiv
           variants={listVariants}
           className="space-y-2 flex justify-center w-full"
         >
-          <Link
-            href={paymentLink}
+          <button
+            onClick={handleCheckout}
             className={cn(
-              "w-full rounded-full flex items-center justify-center gap-2 bg-linear-to-r from-rose-800 to-rose-500 hover:from-rose-500 hover:to-rose-800 text-white border-2 py-2",
+              "w-full rounded-full flex items-center justify-center gap-2 bg-linear-to-r from-rose-800 to-rose-500 hover:from-rose-500 hover:to-rose-800 text-white border-2 py-2 px-4 transition-all duration-300",
               id === "pro"
                 ? "border-rose-500"
                 : "border-rose-100 from-rose-400 to-rose-500"
             )}
           >
             Buy Now <ArrowRight size={18} />
-          </Link>
+          </button>
         </MotionDiv>
       </div>
     </MotionDiv>

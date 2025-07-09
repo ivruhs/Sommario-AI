@@ -1,59 +1,99 @@
+// app/api/payments/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import crypto from "crypto";
 import {
-  handleCheckoutSessionCompleted,
-  handleSubscriptionDeleted,
+  handleTransactionCompleted,
+  handleSubscriptionCancelled,
 } from "@/lib/payments";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 export const POST = async (req: NextRequest) => {
-  const payload = await req.text();
-
-  const sig = req.headers.get("stripe-signature");
-
-  let event;
-
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
-
   try {
-    event = stripe.webhooks.constructEvent(payload, sig!, endpointSecret);
+    const body = await req.text();
+    const signature = req.headers.get("paddle-signature");
 
-    switch (event.type) {
-      case "checkout.session.completed":
-        console.log("checkout session completed");
-        const sessionId = event.data.object.id;
-        const session = await stripe.checkout.sessions.retrieve(sessionId, {
-          expand: ["line_items"],
-        });
-
-        await handleCheckoutSessionCompleted({ session, stripe });
-
-        break;
-
-      case "customer.subscription.deleted":
-        console.log("customer subscription deleted");
-        const subscription = event.data.object;
-        const subscriptionId = event.data.object.id;
-
-        await handleSubscriptionDeleted({ subscriptionId, stripe });
-
-        console.log(subscription);
-
-        break;
-
-      default:
-        console.log(`Unhandled event type ${event.type}`);
+    if (!signature) {
+      return NextResponse.json(
+        { error: "Missing Paddle signature" },
+        { status: 400 }
+      );
     }
-  } catch (err) {
-    console.log(err);
+
+    // Verify Paddle webhook signature
+    const webhookSecret = process.env.PADDLE_WEBHOOK_SECRET!;
+
+    if (!verifyPaddleSignature(body, signature, webhookSecret)) {
+      console.error("Invalid Paddle signature");
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const event = JSON.parse(body);
+    console.log("Received Paddle notification:", event.event_type);
+
+    switch (event.event_type) {
+      case "transaction.completed":
+        console.log("Transaction completed");
+        await handleTransactionCompleted(event.data);
+        break;
+      case "subscription.canceled":
+        console.log("Subscription cancelled");
+        await handleSubscriptionCancelled(event.data);
+        break;
+      default:
+        console.log(`Unhandled event type: ${event.event_type}`);
+    }
+
+    return NextResponse.json({ status: "success" });
+  } catch (error) {
+    console.error("Paddle webhook error:", error);
     return NextResponse.json(
-      { error: "Failed to trigger webhook", err },
-      { status: 400 }
+      { error: "Failed to process webhook" },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    status: "success",
-  });
 };
+
+// Paddle signature verification function
+function verifyPaddleSignature(
+  body: string,
+  signature: string,
+  secret: string
+): boolean {
+  try {
+    // Parse the signature header
+    const parts = signature.split(";");
+    let ts = "";
+    let h1 = "";
+
+    for (const part of parts) {
+      const [key, value] = part.split("=");
+      if (key === "ts") {
+        ts = value;
+      } else if (key === "h1") {
+        h1 = value;
+      }
+    }
+
+    if (!ts || !h1) {
+      console.error("Missing timestamp or hash in signature");
+      return false;
+    }
+
+    // Create the signed payload
+    const signedPayload = `${ts}:${body}`;
+
+    // Calculate the expected signature
+    const expectedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(signedPayload)
+      .digest("hex");
+
+    // Compare signatures
+    return crypto.timingSafeEqual(
+      Buffer.from(h1, "hex"),
+      Buffer.from(expectedSignature, "hex")
+    );
+  } catch (error) {
+    console.error("Error verifying Paddle signature:", error);
+    return false;
+  }
+}

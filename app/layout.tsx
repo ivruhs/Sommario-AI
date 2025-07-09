@@ -17,13 +17,13 @@ export const metadata: Metadata = {
   title: "Sommaire - AI-Powered PDF Summarization",
   description:
     "Save hourrs of readint time. Transform lengthy PDFs into clear, accurate summaries in seconds with our advanced AI technology.",
-  openGraph: {
-    images: [
-      {
-        url: "/opengraph-image.png",
-      },
-    ],
-  },
+  // openGraph: {
+  //   images: [
+  //     {
+  //       url: "/opengraph-image.png",
+  //     },
+  //   ],
+  // },
   // metadataBase: new URL(ORIGIN_URL),
   // alternates: {
   //   canonical: ORIGIN_URL,

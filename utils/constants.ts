@@ -1,5 +1,7 @@
-import { isDev } from "@/utils/helpers";
+// import { isDev } from "@/utils/helpers";
 import { Variants } from "motion/react";
+
+const isDev = process.env.NODE_ENV === "development";
 
 export const pricingPlans = [
   {
@@ -12,10 +14,10 @@ export const pricingPlans = [
       "Email support",
     ],
     id: "basic",
-    paymentLink: isDev
-      ? "https://buy.stripe.com/test_14A9AV2K90Mw8s2fMx8N200"
-      : "",
-    priceId: isDev ? "price_1Rhl8xQQtZEzhI1KrDmQ4CeM" : "",
+    paymentLink: "", // Not needed for Paddle
+    priceId: isDev
+      ? "pri_01jzpvcxetyjnkdgap6hp9a5b1"
+      : "pri_your_production_basic_price_id",
   },
   {
     name: "Pro",
@@ -28,14 +30,10 @@ export const pricingPlans = [
       "Markdown Export",
     ],
     id: "pro",
-    paymentLink:
-      process.env.NODE_ENV === "development"
-        ? "https://buy.stripe.com/test_5kQ4gB0C13YIgYy8k58N201"
-        : "",
-    priceId:
-      process.env.NODE_ENV === "development"
-        ? "price_1Rhl8xQQtZEzhI1KtBbvDyGY"
-        : "",
+    paymentLink: "", // Not needed for Paddle
+    priceId: isDev
+      ? "pri_01jzpvefqwcaq7jaftxy61s1me"
+      : "pri_your_production_pro_price_id",
   },
 ];
 
