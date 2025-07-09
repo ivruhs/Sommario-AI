@@ -75,7 +75,7 @@ export default function TermsAndConditions() {
               href="mailto:radhakrishn0181@gmail.com"
               className="text-blue-600 underline"
             >
-              support@sommario-ai.vercel.app
+              radhakrishn0181@gmail.com
             </a>{" "}
             to initiate a refund request.
           </li>
